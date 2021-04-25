@@ -1,4 +1,5 @@
 # Copyright (c) 2009-2012, 2014-2015, The Linux Foundation. All rights reserved.
+# Copyright (C) 2020-2021 TEAMWIN RECOVERY PROJECT
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -25,6 +26,8 @@
 # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
+import /init.recovery.qcom_decrypt.rc
+
 on fs
     wait /dev/block/platform/soc/${ro.boot.bootdevice}
     symlink /dev/block/platform/soc/${ro.boot.bootdevice} /dev/block/bootdevice
@@ -38,25 +41,13 @@ on early-fs
     start vold
 
 on init
-    start hwservicemanager
+    start vibrator-service
     setprop crypto.ready 1
 
-service sbinqseecomd /sbin/qseecomd
+service sbinqseecomd /system/bin/qseecomd
     user root
     group root
-    disabled
-    seclabel u:r:recovery:s0
-
-service hwservicemanager /system/bin/hwservicemanager
-    user root
-    group root
-    disabled
-    onrestart setprop hwservicemanager.ready false
-    seclabel u:r:recovery:s0
-
-service servicemanager /system/bin/servicemanager
-    user root
-    group root readproc
+    setenv LD_LIBRARY_PATH /vendor/lib64:/vendor/lib:/system/lib64:/system/lib:/sbin
     disabled
     seclabel u:r:recovery:s0
 
@@ -67,36 +58,36 @@ service keystore_auth /system/bin/keystore_auth
     disabled
     seclabel u:r:recovery:s0
 
-# keystore is started and stopped on demand by TWRP
 service keystore /system/bin/keystore /tmp/misc/keystore
     user root
     group root drmrpc readproc
     disabled
     seclabel u:r:recovery:s0
 
-service gatekeeper-1-0 /sbin/android.hardware.gatekeeper@1.0-service-qti
+service gatekeeper-1-0 /system/bin/android.hardware.gatekeeper@1.0-service-qti
+    user root
+    group root
+    setenv LD_LIBRARY_PATH /vendor/lib64:/vendor/lib:/system/lib64:/system/lib:/sbin
+    disabled
+    seclabel u:r:recovery:s0
+
+service keymaster-4-0 /system/bin/android.hardware.keymaster@4.0-service-qti
+    user root
+    group root
+    setenv LD_LIBRARY_PATH /vendor/lib64:/vendor/lib:/system/lib64:/system/lib:/sbin
+    disabled
+    seclabel u:r:recovery:s0
+
+service vibrator-service /system/bin/vendor.qti.hardware.vibrator@1.2-service
     user root
     group root
     disabled
     seclabel u:r:recovery:s0
 
-service keymaster-4-0 /sbin/android.hardware.keymaster@4.0-service-qti
-    user root
-    group root
-    disabled
-    seclabel u:r:recovery:s0
-
-service unified-script /sbin/unified-script.sh
-    user root
-    group root
-    disabled
-    oneshot
-    seclabel u:r:recovery:s0
 
 on boot
     setprop sys.usb.config adb
-#    chmod 0777 /sbin/unified-script.sh
-#    start unified-script
+    
 
 on property:crypto.ready=0
     stop sbinqseecomd
@@ -110,4 +101,9 @@ on property:crypto.ready=1
 on property:vendor.sys.listeners.registered=true
     start keymaster-4-0
     start gatekeeper-1-0
+
+on property:sys.usb.config=fastboot
     start servicemanager
+    start hwservicemanager
+    restart fastbootd
+
